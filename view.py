@@ -1,101 +1,69 @@
-import tkinter as tk
+# -*- coding: utf-8 -*-
+
+# Form implementation generated from reading ui file 'view.ui'
+#
+# Created by: PyQt5 UI code generator 5.10.1
+#
+# WARNING! All changes made in this file will be lost!
 import cv2
-import PIL.Image, PIL.ImageTk
-import time
-
-from authenticator import authenticate
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 
-class ViewGUI:
-    def __init__(self, window, window_title, video_source_front=0, video_source_side=0):
-        self.window = window
-        self.window.title(window_title)
-        self.video_source_front = video_source_front
-        
-        # Defining some images.
-        self.images = {
-            'check' : PIL.Image.open("data/gui_images/check.png").resize((50, 50), PIL.Image.ANTIALIAS),
-            'alert' : PIL.Image.open("data/gui_images/alert.png").resize((50, 50), PIL.Image.ANTIALIAS)
-        }
+class Ui_MainWindow(object):
 
-        # Defining a program icon.
-        icon = tk.PhotoImage(file='data/gui_images/icon.png')
-        self.window.tk.call('wm', 'iconphoto', self.window._w, icon)
+    def setupUi(self, MainWindow):
 
-        # Open video sources.
-        self.vid_front = VideoCapture(self.video_source_front)
-        #self.vid_side = VideoCapture(self.video_source_side)
+        MainWindow.setObjectName("MainWindow")
+        MainWindow.resize(800, 507)
+        icon = QtGui.QIcon()
 
-        # Create a canvas.
-        self.canvas = tk.Canvas(window, width = self.vid_front.width + self.vid_front.width + 50, height = self.vid_front.height + 100)
-        self.canvas.pack()
+        icon.addPixmap(QtGui.QPixmap("data/gui_images/icon.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        MainWindow.setWindowIcon(icon)
 
-        # Recognition result.
-        self.result = None
+        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget.setObjectName("centralwidget")
 
-        # After it is called once, the update method will be automatically called every delay milliseconds
-        self.delay = 15
-        self.update()
-        self.window.mainloop()
+        self.img_cam_frontal = QtWidgets.QLabel(self.centralwidget)
+        self.img_cam_frontal.setGeometry(QtCore.QRect(20, 20, 365, 365))
+        self.img_cam_frontal.setText("")
+        self.img_cam_frontal.setPixmap(QtGui.QPixmap("data/gui_images/webcam.png"))
+        self.img_cam_frontal.setScaledContents(True)
+        self.img_cam_frontal.setObjectName("img_cam_frontal")
 
-    def snapshot(self):
-        # Get a frame from the video source
-        ret_f, frame_f = self.vid_front.get_frame()
+        self.img_cam_side = QtWidgets.QLabel(self.centralwidget)
+        self.img_cam_side.setGeometry(QtCore.QRect(415, 20, 365, 365))
+        self.img_cam_side.setText("")
+        self.img_cam_side.setPixmap(QtGui.QPixmap("data/gui_images/webcam.png"))
+        self.img_cam_side.setScaledContents(True)
+        self.img_cam_side.setObjectName("img_cam_side")
 
-        if ret_f:
-            cv2.imwrite("frame_front-" + time.strftime("%d-%m-%Y-%H-%M-%S") + ".jpg", cv2.cvtColor(frame_f, cv2.COLOR_RGB2BGR))
+        self.image_result = QtWidgets.QLabel(self.centralwidget)
+        self.image_result.setGeometry(QtCore.QRect(190, 420, 61, 61))
+        self.image_result.setText("")
+        self.image_result.setPixmap(QtGui.QPixmap("data/gui_images/check.png"))
+        self.image_result.setScaledContents(True)
+        self.image_result.setObjectName("image_result")
+        self.text_result = QtWidgets.QLabel(self.centralwidget)
+        self.text_result.setGeometry(QtCore.QRect(270, 430, 451, 41))
 
-    def update(self):
-        
-        # Get frames from the video sources.
-        ret_f, frame_f = self.vid_front.get_frame()
-        ret_s, frame_s = self.vid_front.get_frame()
-        
-        # Show the frames in GUI.
-        if ret_f:
-            self.photo_f = PIL.ImageTk.PhotoImage(image = PIL.Image.fromarray(frame_f))
-            self.canvas.create_image(10, 20, image = self.photo_f, anchor = tk.NW)
-        
-        if ret_s:
-            self.photo_s = PIL.ImageTk.PhotoImage(image = PIL.Image.fromarray(frame_s))
-            self.canvas.create_image(670, 20, image = self.photo_s, anchor = tk.NW)
-        
-        # Run authenticator with collected photos.
-        self.result = authenticate(self.photo_f, self.photo_s)
+        font = QtGui.QFont()
+        font.setPointSize(24)
+        font.setBold(True)
+        font.setWeight(75)
 
-        # Show authentication image.
-        render = PIL.ImageTk.PhotoImage(self.images[self.result['im']])
-        img = tk.Label(self.window, image=render)
-        img.image = render
-        img.place(x=self.vid_front.width - 120, y=self.vid_front.height + 35)
-        
-        # Show authentication text.
-        text = tk.Label(self.window, text=self.result['text'])
-        text.pack()
-        text.place(x=self.vid_front.width - 60, y=self.vid_front.height + 50)
+        self.text_result.setFont(font)
+        self.text_result.setObjectName("text_result")
 
-        # Recursive loop.
-        self.window.after(self.delay, self.update)
+        MainWindow.setCentralWidget(self.centralwidget)
 
-class VideoCapture:
-    def __init__(self, video_source=0):
-        # Open the video source
-        self.vid = cv2.VideoCapture(video_source)
-        if not self.vid.isOpened():
-            raise ValueError("Unable to open video source", video_source)
+        self.statusbar = QtWidgets.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        MainWindow.setStatusBar(self.statusbar)
 
-        # Get video source width and height
-        self.width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.height = self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.retranslateUi(MainWindow)
+        QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
-    def get_frame(self):
-        if self.vid.isOpened():
-            ret, frame = self.vid.read()
-            if ret:
-                # Return a boolean success flag and the current frame converted to BGR
-                return (ret, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-    # Release the video source when the object is destroyed
-    def __del__(self):
-        if self.vid.isOpened():
-            self.vid.release()
+    def retranslateUi(self, MainWindow):
+        _translate = QtCore.QCoreApplication.translate
+        MainWindow.setWindowTitle(_translate("MainWindow", "Face Authenticator"))
+        self.text_result.setText(_translate("MainWindow", "TextLabel"))

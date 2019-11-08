@@ -1,11 +1,7 @@
-import PIL.Image, PIL.ImageTk
+class Authenticator:
 
-def authenticate(photo_f, photo_s):
+    def __init__(self):
+        pass
 
-    result = {}
-
-    user = 'User'
-    result['text'] = 'Acess granted, %s.' % (user)
-    result['im'] = 'check'
-
-    return result
+    def authenticate(self, image_1, image_2):
+        pass
