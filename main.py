@@ -1,59 +1,57 @@
 import sys
 import cv2
-import functools
+import random
+import time
+import matplotlib.pyplot as plt
+from collections import deque
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from view import Ui_MainWindow
 from authenticator import Authenticator
 
-
 class MainWindow(QtWidgets.QMainWindow):
 
-    def __init__(self):
+    def __init__(self, source):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        
+        # Create video capture.
+        self.cap = cv2.VideoCapture(source)
+        self.image = self.cap.read()[1]
 
         """ Image timer thread. """
         # Create a timer.
         self.timer_images = QtCore.QTimer(self)
-        self.controlTimer_images(source_1=0, source_2=2, delay=20)     
+        self.control_timer_images(delay=20)     
 
         # Set timer timeout callback function.
-        self.timer_images.timeout.connect(self.viewCam)
+        self.timer_images.timeout.connect(self.update_cam_image)
+    
+    def get_image(self):
+        return self.image
 
-    def viewCam(self):
+    def update_cam_image(self):
 
         # Read image in BGR format.
-        _, image_1 = self.cap_1.read()
-        _, image_2 = self.cap_2.read()
+        _, image = self.cap.read()
 
         # Convert image to RGB format.
-        image_1 = cv2.cvtColor(image_1, cv2.COLOR_BGR2RGB)
-        image_2 = cv2.cvtColor(image_2, cv2.COLOR_BGR2RGB)
+        self.image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Get image infos.
-        height_1, width_1, channel_1 = image_1.shape
-        step_1 = channel_1 * width_1
-
-        height_2, width_2, channel_2 = image_2.shape
-        step_2 = channel_2 * width_2
+        height, width, channel = self.image.shape
+        step = channel * width
 
         # Create QImage from image.
-        qImg_1 = QtGui.QImage(image_1.data, width_1, height_1, step_1, QtGui.QImage.Format_RGB888)
-        qImg_2 = QtGui.QImage(image_2.data, width_2, height_2, step_2, QtGui.QImage.Format_RGB888)
-        
-        # Show image in img_label.
-        self.ui.img_cam_frontal.setPixmap(QtGui.QPixmap.fromImage(qImg_1))
-        self.ui.img_cam_side.setPixmap(QtGui.QPixmap.fromImage(qImg_2))
+        qImg = QtGui.QImage(self.image.data, width, height, step, QtGui.QImage.Format_RGB888)
 
-    def controlTimer_images(self, source_1, source_2, delay):
+        # Show image in img_label.
+        self.ui.img_cam_frontal.setPixmap(QtGui.QPixmap.fromImage(qImg))
+        
+    def control_timer_images(self, delay):
 
         if not self.timer_images.isActive():
-            # Create video capture.
-            self.cap_1 = cv2.VideoCapture(source_1)
-            self.cap_2 = cv2.VideoCapture(source_2) 
-            
             # Start timer.
             self.timer_images.start(delay)
 
@@ -61,16 +59,69 @@ class MainWindow(QtWidgets.QMainWindow):
             # Stop timer.
             self.timer_images.stop()
             # Release video capture.
-            self.cap_1.release()
-            self.cap_2.release()
-        
+            self.cap.release()
 
+class AuthenticatorThread(QtCore.QThread):
+
+    def __init__(self, main_window):
+        QtCore.QThread.__init__(self)
+        self.authenticator = Authenticator()
+        self.main_window = main_window
+
+        self.main_window.ui.add_user.clicked.connect(self.add_user)
+
+    def add_user(self):
+
+        while True:
+            image = self.main_window.get_image()
+            face_location = self.authenticator.face_crop(image)
+
+            if face_location != []:
+                top, right, bottom, left = face_location
+
+                if self.authenticator.add_user(image[top:bottom, left:right], 'User'):
+                    break
+            
+            time.sleep(0.1)
+
+    def run(self):
+        
+        while True:
+
+            image = self.main_window.get_image()
+            face_location = self.authenticator.face_crop(image)
+
+            if face_location != []:
+                top, right, bottom, left = face_location
+                classification_result = self.authenticator.face_classifier(image[top:bottom, left:right])
+
+                if classification_result[1]:
+                    self.main_window.ui.image_result.setVisible(True)
+                    self.main_window.ui.text_result.setText(classification_result[0])
+                    self.main_window.ui.image_result.setPixmap(QtGui.QPixmap("data/gui_images/check.png"))
+                
+                elif classification_result[0] == "User does not exist in database.":
+                    self.main_window.ui.image_result.setVisible(True)
+                    self.main_window.ui.text_result.setText(classification_result[0])
+                    self.main_window.ui.image_result.setPixmap(QtGui.QPixmap("data/gui_images/alert.png"))
+
+            time.sleep(1)            
+            self.main_window.ui.text_result.setText("")
+            self.main_window.ui.image_result.setVisible(False)
+    
+              
 if __name__ == '__main__':
+
     app = QtWidgets.QApplication(sys.argv)
 
-    # Create and show MainWindow
-    mainWindow = MainWindow()
+    # Create and show MainWindow.
+    mainWindow = MainWindow(source=0)
     mainWindow.show()
+    
+    # Start authenticator thread.
+    authenticator_thread = AuthenticatorThread(mainWindow)
+    authenticator_thread.finished.connect(app.exit)
+    authenticator_thread.start()
 
     sys.exit(app.exec_())
-
+    
