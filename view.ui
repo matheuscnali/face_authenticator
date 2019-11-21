@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>507</height>
+    <width>459</width>
+    <height>485</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,32 +18,13 @@
     <normaloff>face-authenticator/data/gui_images/icon.png</normaloff>face-authenticator/data/gui_images/icon.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QLabel" name="cam_frontal">
+   <widget class="QLabel" name="cam">
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>40</y>
-      <width>281</width>
-      <height>281</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="pixmap">
-     <pixmap>face-authenticator/data/gui_images/webcam.png</pixmap>
-    </property>
-    <property name="scaledContents">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QLabel" name="cam_side">
-    <property name="geometry">
-     <rect>
-      <x>460</x>
-      <y>40</y>
-      <width>281</width>
-      <height>281</height>
+      <y>30</y>
+      <width>361</width>
+      <height>321</height>
      </rect>
     </property>
     <property name="text">
@@ -78,9 +59,9 @@
    <widget class="QLabel" name="text_result">
     <property name="geometry">
      <rect>
-      <x>270</x>
-      <y>410</y>
-      <width>451</width>
+      <x>50</x>
+      <y>400</y>
+      <width>301</width>
       <height>41</height>
      </rect>
     </property>
@@ -98,7 +79,7 @@
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>610</x>
+      <x>340</x>
       <y>410</y>
       <width>90</width>
       <height>32</height>
