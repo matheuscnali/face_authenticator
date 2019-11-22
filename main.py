@@ -5,6 +5,7 @@ import time
 import matplotlib.pyplot as plt
 from collections import deque
 from PyQt5 import QtCore, QtGui, QtWidgets
+from multiprocessing import Process
 
 from view import Ui_MainWindow
 from authenticator import Authenticator
@@ -56,7 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.timer_images.start(delay)
 
         else:
-            # Stop timer.
+            # Stop timer
             self.timer_images.stop()
             # Release video capture.
             self.cap.release()
@@ -69,37 +70,53 @@ class AuthenticatorThread(QtCore.QThread):
         self.main_window = main_window
 
         self.main_window.ui.add_user.clicked.connect(self.add_user)
+        self.main_window.ui.remove_user.clicked.connect(self.remove_user)
 
     def add_user(self):
 
         while True:
-            image = self.main_window.get_image()
+            image = cv2.imread("example.jpeg")
+            #image = self.main_window.get_image()
             face_location = self.authenticator.face_crop(image)
 
             if face_location != []:
                 top, right, bottom, left = face_location
 
-                if self.authenticator.add_user(image[top:bottom, left:right], 'User'):
+                if self.authenticator.add_user(image[top:bottom, left:right], self.main_window.ui.id_text.toPlainText()):
                     break
             
             time.sleep(0.1)
 
+    def remove_user(self):
+
+        self.authenticator.remove_user(self.main_window.ui.id_text.toPlainText())
+
+
     def run(self):
         
         while True:
-
-            image = self.main_window.get_image()
+            
+            image = cv2.imread("example.jpeg")
+            #image = self.main_window.get_image()
             face_location = self.authenticator.face_crop(image)
 
             if face_location != []:
                 top, right, bottom, left = face_location
-                classification_result = self.authenticator.face_classifier(image[top:bottom, left:right])
-
+                face = image[top:bottom, left:right]
+                classification_result = self.authenticator.face_classifier(face)
+            
                 if classification_result[1]:
-                    self.main_window.ui.image_result.setVisible(True)
-                    self.main_window.ui.text_result.setText(classification_result[0])
-                    self.main_window.ui.image_result.setPixmap(QtGui.QPixmap("data/gui_images/check.png"))
-                
+                    life_proof_result = self.authenticator.life_proof(face)
+                    if life_proof_result:
+                        self.main_window.ui.image_result.setVisible(True)
+                        self.main_window.ui.text_result.setText("%s\nPassed in life proof." %(classification_result[0]))
+                        self.main_window.ui.image_result.setPixmap(QtGui.QPixmap("data/gui_images/check.png"))
+                    
+                    else:
+                        self.main_window.ui.image_result.setVisible(True)
+                        self.main_window.ui.text_result.setText("%s\nFailed in life proof." %(classification_result[0]))
+                        self.main_window.ui.image_result.setPixmap(QtGui.QPixmap("data/gui_images/alert.png"))
+
                 elif classification_result[0] == "User does not exist in database.":
                     self.main_window.ui.image_result.setVisible(True)
                     self.main_window.ui.text_result.setText(classification_result[0])
