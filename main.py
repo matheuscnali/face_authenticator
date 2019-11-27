@@ -75,8 +75,8 @@ class AuthenticatorThread(QtCore.QThread):
     def add_user(self):
 
         while True:
-            image = cv2.imread("example.jpeg")
-            #image = self.main_window.get_image()
+            #image = cv2.imread("example.jpeg")
+            image = self.main_window.get_image()
             face_location = self.authenticator.face_crop(image)
 
             if face_location != []:
@@ -96,8 +96,8 @@ class AuthenticatorThread(QtCore.QThread):
         
         while True:
             
-            image = cv2.imread("example.jpeg")
-            #image = self.main_window.get_image()
+            #image = cv2.imread("example.jpeg")
+            image = self.main_window.get_image()
             face_location = self.authenticator.face_crop(image)
 
             if face_location != []:

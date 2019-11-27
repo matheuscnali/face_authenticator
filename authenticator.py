@@ -69,8 +69,9 @@ class Authenticator:
 
         if face_encoding == []:
             return ("Face encoding is []", False)
-
-        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
+        
+        # Tolerance of 0.6.
+        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.6)
        
         if True in matches:
             first_match_index = matches.index(True)
