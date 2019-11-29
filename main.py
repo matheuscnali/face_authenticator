@@ -10,6 +10,8 @@ from multiprocessing import Process
 from view import Ui_MainWindow
 from authenticator import Authenticator
 
+debug = False
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, source):
@@ -101,12 +103,15 @@ class AuthenticatorThread(QtCore.QThread):
             face_location = self.authenticator.face_crop(image)
 
             if face_location != []:
+                if debug:
+                    print('A face was detected.')
                 top, right, bottom, left = face_location
                 face = image[top:bottom, left:right]
-                classification_result = self.authenticator.face_classifier(face)
-            
+
+                classification_result = self.authenticator.face_classifier(face, debug=False)
+
                 if classification_result[1]:
-                    life_proof_result = self.authenticator.life_proof(face)
+                    life_proof_result = self.authenticator.life_proof(face, face_location)
                     if life_proof_result:
                         self.main_window.ui.image_result.setVisible(True)
                         self.main_window.ui.text_result.setText("%s\nPassed in life proof." %(classification_result[0]))
@@ -129,6 +134,7 @@ class AuthenticatorThread(QtCore.QThread):
               
 if __name__ == '__main__':
 
+    debug = False 
     app = QtWidgets.QApplication(sys.argv)
 
     # Create and show MainWindow.
