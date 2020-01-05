@@ -64,7 +64,7 @@ class Authenticator:
         else:
             return False
 
-    def life_proof(self, face_img, debug=False):
+    def life_proof(self, face_img, params, debug=False):
         
         def save_img(img, name, ):
             cv2.imwrite(str('results/%s/%s.png' %(curr_time, name)), img)
@@ -76,55 +76,53 @@ class Authenticator:
             return cv2.resize(image, new_dim, interpolation = cv2.INTER_AREA)
 
         # Reescale to 800px width
-        face_img_reescaled = width_reescale(face_img, width=800)
+        face_img_reescaled = width_reescale(face_img, width=params['img_reescale_width'])
 
         # Convert to gray scale
         gray = cv2.cvtColor(face_img_reescaled, cv2.COLOR_BGR2GRAY)
 
         # Contrast equalization
-        clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=params['clipLimit'], tileGridSize=params['tileGridSize'])
         grayEq = clahe.apply(gray)
 
         # Reescale ROI 500px width
-        grayEq_reescaled = width_reescale(grayEq, width=500) 
+        grayEq_reescaled = width_reescale(grayEq, width=params['gray_reescale_width']) 
 
-        # Apply Blur to remove high frequency noise
-        blurred = cv2.GaussianBlur(grayEq_reescaled, (3, 3), 0)
+        # Apply blur to remove high frequency noise
+        blurred = cv2.GaussianBlur(grayEq_reescaled, ksize=params['blur_ksize'], sigmaX=params['blur_sigmaX'])
 
         # Apply threshold to highlight dots
-        thresh = cv2.threshold(blurred, 170, 255, cv2.THRESH_BINARY)[1]
+        thresh = cv2.threshold(blurred, params['thresh'], 255, cv2.THRESH_BINARY)[1]
 
         # Connected components analysis to generate a blobs mask
         labels = measure.label(thresh, connectivity=2, background=0)
         mask = np.zeros(thresh.shape, dtype="uint8")
 
         # Removing outliers (too big or small blobs)
-        minBlob = 100; maxBlob = 5000
         for label in np.unique(labels):
             # if this is the background label, ignore it
             if label == 0:
                 continue
 
-            # otherwise, construct the label mask and count the
-            # number of pixels
+            # otherwise, construct the label mask and count the number of pixels
             labelMask = np.zeros(thresh.shape, dtype="uint8")
             labelMask[labels == label] = 255
             numPixels = cv2.countNonZero(labelMask)
 
             # Adding blobs that are inside the limits
-            if minBlob < numPixels < maxBlob:
+            if params['min_blob'] < numPixels < params['max_blob']:
                 mask = cv2.add(mask, labelMask)
 
         # Find image contours
-        cnts = cv2.findContours(mask.copy(), cv2.RETR_TREE,
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
                                 cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
 
         pts = [] # List of selected dots
         for c in cnts:
             ((cX, cY), radius) = cv2.minEnclosingCircle(c)
-            if 5 < radius < 30: # Filter blobs by radius size
-                if 120 < cX < grayEq.shape[1] - 120: # Removing 120px of each side to focus in the center of the face
+            if params['min_radius'] < radius < params['max_radius']: # Filter blobs by radius size
+                if 120 < cX < grayEq.shape[1] - 120:                 # Removing 120px of each side to focus in the center of the face
                     if 100 < cY < grayEq.shape[0] - 100:
                         cv2.circle(grayEq, (int(cX), int(cY)), int(radius),
                                   (0, 0, 255), 2)
@@ -138,7 +136,6 @@ class Authenticator:
 
         # Analysing each line (Dots are analysed by OpenCV from left to right, top to bottom)
         # Lines are determined by the variation of the Y values
-
         last_Y = 0
         lines_num = 0
         first_iteration = True
@@ -159,7 +156,7 @@ class Authenticator:
                     line_change = False
 
                 else:
-                    if abs(last_Y - y) < 10:  # Check if the current point is in another line
+                    if abs(last_Y - y) < params['y_line_dist']:  # Check if the current point is in another line
                         temp_x_list.append(x) 
                         temp_y_list.append(y)
                     else:
@@ -189,8 +186,9 @@ class Authenticator:
 
         print('Total variance average: %.2f' % int(total_var))
 
-        colorEqCrop = cv2.cvtColor(grayEq, cv2.COLOR_GRAY2RGB) # Converting grayscale to colored 
+        colorEqCrop = cv2.cvtColor(grayEq, cv2.COLOR_GRAY2RGB) # Converting grayscale to color 
 
+        # Saving pre processing results
         if debug:
             curr_time = time.ctime()
             os.mkdir('results/%s' % curr_time)
@@ -203,9 +201,10 @@ class Authenticator:
             save_img(blurred, '6_blurred')
             save_img(thresh, '7_thresh')
             save_img(colorEqCrop, '8_colorEqCrop')
+            plt.savefig('results/%s/lines.png' % curr_time)
 
         # Printing results
-        if total_var > 20:
+        if total_var > params['total_var_limit']:
             print ('Sucess in life proof\n'); print('-----------------------------------------\n')
             return True
         else:

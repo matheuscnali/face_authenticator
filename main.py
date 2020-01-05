@@ -101,6 +101,22 @@ class AuthenticatorThread(QtCore.QThread):
 
     def run(self):
         
+        life_proof_params = {
+            'img_reescale_width' : 800,
+            'clipLimit' : 3,
+            'tileGridSize' : (8, 8),
+            'gray_reescale_width' : 500,
+            'blur_ksize' : (3, 3),
+            'blur_sigmaX' : 0, 
+            'thresh' : 170,
+            'min_blob' : 100,
+            'max_blob' : 5000,
+            'min_radius' : 4,
+            'max_radius' : 30,
+            'y_line_dist' : 8,
+            'total_var_limit' : 20
+        }
+
         while True:
             cam_img = self.main_window.get_cam_img()
             face_location = self.authenticator.face_crop(cam_img)
@@ -112,7 +128,7 @@ class AuthenticatorThread(QtCore.QThread):
                 classification_result = self.authenticator.face_classifier(face)
 
                 if classification_result:
-                    life_proof_result = self.authenticator.life_proof(face, debug=True)
+                    life_proof_result = self.authenticator.life_proof(face, params=life_proof_params, debug=True)
                     if life_proof_result:
                         self.main_window.ui.text_result.setText("%s\nPassed in life proof." %(classification_result))
                         self.main_window.ui.img_result.setVisible(True)
