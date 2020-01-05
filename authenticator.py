@@ -6,7 +6,8 @@ import argparse
 import imutils
 import cv2
 import face_recognition
-
+import os
+import time
 
 from PIL import Image, ImageDraw
 
@@ -14,140 +15,89 @@ class Authenticator:
     
     def __init__(self):
         
-        self.known_face_encodings = np.array([])
-        self.known_face_id = np.array([])
+        self.known_face_encodings = np.empty((0, 128))
+        self.known_face_id = np.empty(0)
 
-    def add_user(self, image, id):
-        
-        if face_recognition.face_encodings(image) == []:
-            return False
+    def add_user(self, image, user_id):
 
-        if len(self.known_face_encodings) == 0:
-            self.known_face_encodings = np.hstack((self.known_face_encodings, face_recognition.face_encodings(image)[0]))
-            self.known_face_id = np.hstack((self.known_face_id, id))
+        self.known_face_encodings = np.append(self.known_face_encodings, [face_recognition.face_encodings(image)[0]], axis=0)
+        self.known_face_id = np.append(self.known_face_id, [user_id], axis=0)
     
-        else:
-            self.known_face_encodings = np.vstack((self.known_face_encodings, face_recognition.face_encodings(image)[0]))
-            self.known_face_id = np.hstack((self.known_face_id, id))
-    
-        return True
-    
-    def remove_user(self, id):
+    def remove_user(self, user_id):
 
-        ids = np.where(self.known_face_id == id)
+        ids = np.where(self.known_face_id == user_id)
 
         self.known_face_id = np.delete(self.known_face_id, ids)
-        
-        if len(self.known_face_encodings) == 128:
-            self.known_face_encodings = np.array([])
-        else:
-            self.known_face_encodings = np.delete(self.known_face_encodings, ids, 0)
+        self.known_face_encodings = np.delete(self.known_face_encodings, ids, 0)
 
     def face_crop(self, image):
 
-        def face_area(face):
+        def get_bb_area(face):
             top, right, bottom, left = face
             return (bottom-top)*(right-left)
         
-        faces_locations = face_recognition.face_locations(image)
+        # Getting faces bounding boxes
+        faces_bb = face_recognition.face_locations(image)
         
-        # Get the biggest bounding box.
-        if faces_locations != []:
-            curr_face = faces_locations[0]
-            for face in faces_locations:
-                if face_area(face) > face_area(curr_face):
-                    curr_face = face
-        
-            return curr_face
-        
-        return faces_locations
+        # Get the biggest bounding box
+        if faces_bb:
+            return max(faces_bb, key=get_bb_area)
+        else:
+            return False
 
-    def face_classifier(self, image, debug=False):
+    def face_classifier(self, face_img):
 
-        face_location = face_recognition.face_locations(image)
-        face_encoding = face_recognition.face_encodings(image, face_location)
+        face_encoding = face_recognition.face_encodings(face_img)
 
-        if face_encoding == []:
-            return ("Face encoding is []", False)
+        if not face_encoding:
+            return False
         
-        # Tolerance of 0.6.
+        # Check for similar face with tolerance of 0.6
         matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.6)
        
         if True in matches:
             first_match_index = matches.index(True)
             name = self.known_face_id[first_match_index]
-            if debug:
-                print('User detected %s' %(name))
-            return ("User '%s' detected." % (name), True)
-        print('User does not exist in database.')
-        return ("User does not exist in database.", False)
+            return "User '%s' detected." % (name)
+        else:
+            return False
 
-    def life_proof(self, RAWimage, face_location, debug=False):
-                #Ajusta o tamanho da imagem para 800px de largura
-        largura = 800
-        scale = largura / RAWimage.shape[1]
-        print('Escala de resize: ' + str(1/scale))
-        newdim = (largura, int(RAWimage.shape[0] * scale))
-        image = cv2.resize(RAWimage, newdim, interpolation = cv2.INTER_AREA)
-        #cv2.imshow('Processamento Demo', image)
-        #cv2.waitKey(tempo)
+    def life_proof(self, face_img, debug=False):
+        
+        def save_img(img, name, ):
+            cv2.imwrite(str('results/%s/%s.png' %(curr_time, name)), img)
 
+        def width_reescale(image, width):
 
-        # Transforma em preto e branco
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        #cv2.imshow('Processamento Demo', gray)
-        #cv2.waitKey(tempo)
+            scale = width / image.shape[1]
+            new_dim = (width, int(image.shape[0] * scale))
+            return cv2.resize(image, new_dim, interpolation = cv2.INTER_AREA)
 
-        #equaliza o contraste
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        # Reescale to 800px width
+        face_img_reescaled = width_reescale(face_img, width=800)
+
+        # Convert to gray scale
+        gray = cv2.cvtColor(face_img_reescaled, cv2.COLOR_BGR2GRAY)
+
+        # Contrast equalization
+        clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(8, 8))
         grayEq = clahe.apply(gray)
-        #cv2.imshow('Processamento Demo', grayEq)
-        #cv2.waitKey(tempo)
 
-        #reconhece os limites da cabeca
-        #face_locations = face_recognition.face_locations(image)
-        #(top, right, bottom, left)
-        #top = face_locations[0][0]
-        #right = face_locations[0][1]
-        #bottom = face_locations[0][2]
-        #left = face_locations[0][3]
-        top, right, bottom, left = face_location
+        # Reescale ROI 500px width
+        grayEq_reescaled = width_reescale(grayEq, width=500) 
 
+        # Apply Blur to remove high frequency noise
+        blurred = cv2.GaussianBlur(grayEq_reescaled, (3, 3), 0)
 
-        #Corta a regiao de interesse (crop)
-        grayEq = grayEq[top:bottom, left:right]
-
-
-        #Ajusta o tamanho da ROI para 500px de largura
-        largura2 = 500
-        scale2 = largura / grayEq.shape[1]
-        print('Escala de resize 2: ' + str(scale2))
-        newdim = (largura, int(grayEq.shape[0] * scale2))
-        grayEqCrop = cv2.resize(grayEq, newdim, interpolation = cv2.INTER_AREA)
-        #cv2.imshow('Processamento Demo', grayEqCrop)
-        #cv2.waitKey(tempo)
-
-        #Aplica Blur pra remover ruido de alta freq
-        blurred = cv2.GaussianBlur(grayEqCrop, (3, 3), 0)
-        #cv2.imshow('Processamento Demo', blurred)
-        #cv2.waitKey(tempo)
-
-        #Aplicando o Threshold para evidenciar os pontos
-        #neste Caso, pode-se calibrar o valor. 200 eh a base
+        # Apply threshold to highlight dots
         thresh = cv2.threshold(blurred, 170, 255, cv2.THRESH_BINARY)[1]
-        #cv2.imshow('Processamento Demo', thresh)
-        #cv2.waitKey(tempo)
 
-        #Performando uma análise de componentes conectados, para gerar uma máscara de blobls
-        labels = measure.label(thresh, neighbors=8, background=0)
+        # Connected components analysis to generate a blobs mask
+        labels = measure.label(thresh, connectivity=2, background=0)
         mask = np.zeros(thresh.shape, dtype="uint8")
 
-
-        # loop sobre os blobs para eliminar blobs pequenos e muito grandes
-        minBlob = 100 # variaveis de controle
-        maxBlob = 5000 # variaveis de controle
-        print( 'minimo blob:' + str(minBlob) )
-        print( 'maximo blob: ' + str(maxBlob) )
+        # Removing outliers (too big or small blobs)
+        minBlob = 100; maxBlob = 5000
         for label in np.unique(labels):
             # if this is the background label, ignore it
             if label == 0:
@@ -159,303 +109,100 @@ class Authenticator:
             labelMask[labels == label] = 255
             numPixels = cv2.countNonZero(labelMask)
 
-            #Se o número de pixels dentro do blob estiver dentro dum limite, ele é add
-            if numPixels > minBlob and numPixels < maxBlob:
-                #o tamanho dos blobs que ficam controla-se por aqui, o 500 eh para eliminar grandes blobls
+            # Adding blobs that are inside the limits
+            if minBlob < numPixels < maxBlob:
                 mask = cv2.add(mask, labelMask)
 
-        #cv2.imshow('Processamento Demo', mask)
-        #cv2.waitKey(tempo)
-
-        #Acha os contornos na imagem
-        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+        # Find image contours
+        cnts = cv2.findContours(mask.copy(), cv2.RETR_TREE,
                                 cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
 
-
-
-        # iterando sobre os contornos
-        pts =[] #lista de pontos que vão ser selecionados
+        pts = [] # List of selected dots
         for c in cnts:
             ((cX, cY), radius) = cv2.minEnclosingCircle(c)
-            if radius > 4 and radius < 30: #controle do tamanho dos pontos que serão detectados, pelo raio
-                if cX > 120 and cX < grayEqCrop.shape[1] - 120: #comi 100px de cada lado da imagem pra concentrar os pontos no centro da face
-                    if cY > 100 and cY < grayEqCrop.shape[0] - 100:
-                        cv2.circle(grayEqCrop, (int(cX), int(cY)), int(radius),
+            if 5 < radius < 30: # Filter blobs by radius size
+                if 120 < cX < grayEq.shape[1] - 120: # Removing 120px of each side to focus in the center of the face
+                    if 100 < cY < grayEq.shape[0] - 100:
+                        cv2.circle(grayEq, (int(cX), int(cY)), int(radius),
                                   (0, 0, 255), 2)
-                        pts.append((cX, cY)) #salva os pontos em pts
-        #cv2.imshow("Processamento Demo", grayEqCrop)
-        #cv2.waitKey(tempo)
-        print('Pontos Encontrados:' + str(len(pts)))
+                        pts.append((cX, cY))
 
+        print('Number of Dots: %s' % str(len(pts)))
 
+        # Analysing each line (Dots are analysed by OpenCV from left to right, top to bottom)
+        # Lines are determined by the variation of the Y values
 
-        #processo de análise de linhas individuais (os pontos são escaneados pelo CV da esquerda pra direita, cima pra baixo)
-        #como numa varredura. Irei percorrer os pontos até que haja uma grande variação no valor y, aí eu saberei que a linha
-        #mudou para uma linha mais abaixo. Pequenas variações em Y devem ser toleradas devido ao entortamento da linha
         last_Y = 0
-        num_linhas = 0
+        lines_num = 0
         first_iteration = True
         line_change = False
-        lista_y_das_linhas = [] #lista com os valores de Y dos pontos da linha X, a variancia desses valores de Y determinará o entortamento dela
-        temp_x_list = [] #listas temporarias pro meu plot
-        temp_y_list = []
-        for  (x,y) in pts:
+        y_lines = [] # List with Y values of dots of a line, the variance of that line will determine how much it's bended
+        temp_x_list = []; temp_y_list = [] # Temporary lines for plotting
+        for (x, y) in pts:
             if not first_iteration:
-                if line_change: #ao mudar a linha, salva-se a lista temporaria de pontos Y na lista principal (lista de listas, uma lista por linha)
-                    lista_y_das_linhas.append(temp_y_list)
-                    plt.plot(temp_x_list, temp_y_list) #plota-se os pontos daquela linha (para a cor ficar univorme)
-                    plt.scatter(temp_x_list[:],temp_y_list[:] ) #coloca a dispersão dos pontos daquela linha (cor tb uniforme)
-
-                    temp_x_list = [] #esvaziando as listas para a próxima linha
-                    temp_y_list = []
+                if line_change: # When the line changes, the temporary line list is saved in the main line list.
+                    y_lines.append(temp_y_list)
+                    plt.plot(temp_x_list, temp_y_list) # Plotting the line dots
+                    plt.scatter(temp_x_list[:], temp_y_list[:] ) # Plotting the points of that line
+                    
+                    # Reseting lists for the next line
+                    temp_x_list = []; temp_y_list = []
                     temp_x_list.append(x)
                     temp_y_list.append(y)
                     line_change = False
-                else: #ainda dentro da mesma linha
-                    if abs(last_Y - y) < 10:  # isso significa que Y variou pouco, ou seja, estamos na mesma linha
-                        temp_x_list.append(x) # salva a coordenada x conforme percorre os pontos da linha
+
+                else:
+                    if abs(last_Y - y) < 10:  # Check if the current point is in another line
+                        temp_x_list.append(x) 
                         temp_y_list.append(y)
-                    else: #trigger de mudança de linha
-                        num_linhas += 1
+                    else:
+                        lines_num += 1
                         line_change = True
-            last_Y = y #sempre salvar o ultimo valor de Y o ultimo ponto analizado para avaliar o delta
+
+            last_Y = y # Saving the last Y to check if there is a line change
             first_iteration  = False
 
-        print ('Linhas Encontradas: ' + str(num_linhas))
+        print('Number of lines: %s\n' % lines_num)
 
-        if num_linhas == 0:
+        if lines_num == 0:
+            print ('Failed in file proof\n'); print('-----------------------------------------\n')
             return False
 
-        # Cálculo da Variância por linha e total
-        totalvar = 0 #variancia acumulada, usado pra calcular media
-        for i in range(num_linhas-1):
-            varlinha = np.var(lista_y_das_linhas[i])
-            print ('Variancia Linha ' + str(i+1) + ': ' + str(varlinha) + '\n') #calcula variância dos Ys da linha
-            if varlinha > 0.0:
-                totalvar += varlinha #acumula nessa variavel
+        # Computing the variance of each line and the variance between all the lines
+        total_var = 0 # Cumulative variance, used to compute the average
+        for i in range(lines_num-1):
+            line_var = np.var(y_lines[i])
+            print('Line Variance %s: %.2f\n' % ((i+1), int(line_var))) # Compute the variance of Y coordinate of the dots in a line
+            if line_var > 0.0:
+                total_var += line_var # Accumulate in this variable
             else:
-                num_linhas -= 1
+                lines_num -= 1
 
-        totalvar = totalvar / num_linhas #tira a média
+        total_var = total_var / lines_num # Average
 
-        print ('Variancia total Media')
-        print (totalvar)
+        print('Total variance average: %.2f' % int(total_var))
 
-
-        colorEqCrop = cv2.cvtColor(grayEqCrop,cv2.COLOR_GRAY2RGB) #convertendo minha grayEqCrop para imagem colorida
-
-        #printando os resultados
-        if totalvar > 5:
-            print ('SUCESSO!')
-            return True
-            cv2.putText(colorEqCrop, 'SUCESSO NA PROVA DE VIDA', (80, 750), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 180, 0), 6)
-        else:
-            print ('FALHA')
-            return False
-            cv2.putText(colorEqCrop, 'FALHA NA PROVA DE VIDA', (100, 750), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 180), 6)
-
-        #cv2.imshow("Processamento Demo", colorEqCrop)
-        #cv2.waitKey(tempo)
-        #plt.show() #mostrando a análise dos pontos de forma gráfica
-
-
-
-    def life_proof_ol(self, RAWimage, face_location, debug=False):
-        
-
-        #Ajusta o tamanho da imagem para 800px de largura
-        largura = 800
-        scale = largura / RAWimage.shape[1]
-        print('Escala de resize: ' + str(1/scale))
-        newdim = (largura, int(RAWimage.shape[0] * scale))
-        image = cv2.resize(RAWimage, newdim, interpolation = cv2.INTER_AREA)
-        if debug:
-            cv2.imshow('Processamento Demo', image)
-            cv2.waitKey(50)
-        
-
-
-        # Transforma em preto e branco
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        if debug:
-            cv2.imshow('Processamento Demo', gray)
-            cv2.waitKey(50)
-
-
-        #equaliza o contraste
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-        grayEq = clahe.apply(gray)
-        if debug:
-            cv2.imshow('Processamento Demo', grayEq)
-            cv2.waitKey(50)
-
-
-        #reconhece os limites da cabeca
-        #face_locations = face_recognition.face_locations(image)
-        #(top, right, bottom, left)
-        top, right, bottom, left = face_location
-
-        #Corta a regiao de interesse (crop)
-        grayEq = grayEq[top:bottom, left:right]
-
-
-        #Ajusta o tamanho da ROI para 500px de largura
-        largura2 = 500
-        scale2 = largura / grayEq.shape[1]
-        print('Escala de resize 2: ' + str(scale2))
-        newdim = (largura, int(grayEq.shape[0] * scale2))
-        grayEqCrop = cv2.resize(grayEq, newdim, interpolation = cv2.INTER_AREA)
-        if debug:
-            cv2.imshow('Processamento Demo', grayEqCrop)
-            cv2.waitKey(50)
-
-
-        #Aplica Blur pra remover ruido de alta freq
-        blurred = cv2.GaussianBlur(grayEqCrop, (3, 3), 0)
-        if debug:
-            cv2.imshow('Processamento Demo', blurred)
-            cv2.waitKey(50)
-
-
-        #Aplicando o Threshold para evidenciar os pontos
-        #neste Caso, pode-se calibrar o valor. 200 eh a base
-        thresh = cv2.threshold(blurred, 170, 255, cv2.THRESH_BINARY)[1]
-        if debug:
-            cv2.imshow('Processamento Demo', thresh)
-            cv2.waitKey(50)
-
-
-        #Performando uma análise de componentes conectados, para gerar uma máscara de blobls
-        labels = measure.label(thresh, neighbors=8, background=0)
-        mask = np.zeros(thresh.shape, dtype="uint8")
-
-
-        # loop sobre os blobs para eliminar blobs pequenos e muito grandes
-        minBlob = 100 # variaveis de controle
-        maxBlob = 5000 # variaveis de controle
-        print( 'minimo blob:' + str(minBlob) )
-        print( 'maximo blob: ' + str(maxBlob) )
-        for label in np.unique(labels):
-            # if this is the background label, ignore it
-            if label == 0:
-                continue
-
-            # otherwise, construct the label mask and count the
-            # number of pixels
-            labelMask = np.zeros(thresh.shape, dtype="uint8")
-            labelMask[labels == label] = 255
-            numPixels = cv2.countNonZero(labelMask)
-
-            #Se o número de pixels dentro do blob estiver dentro dum limite, ele é add
-            if numPixels > minBlob and numPixels < maxBlob:
-                #o tamanho dos blobs que ficam controla-se por aqui, o 500 eh para eliminar grandes blobls
-                mask = cv2.add(mask, labelMask)
+        colorEqCrop = cv2.cvtColor(grayEq, cv2.COLOR_GRAY2RGB) # Converting grayscale to colored 
 
         if debug:
-            cv2.imshow('Processamento Demo', mask)
-            cv2.waitKey(500)
-
-
-        #Acha os contornos na imagem
-        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-
-
-
-        # iterando sobre os contornos
-        pts =[] #lista de pontos que vão ser selecionados
-        for c in cnts:
-            ((cX, cY), radius) = cv2.minEnclosingCircle(c)
-            if radius > 4 and radius < 30: #controle do tamanho dos pontos que serão detectados, pelo raio
-                if cX > 120 and cX < grayEqCrop.shape[1] - 120: #comi 100px de cada lado da imagem pra concentrar os pontos no centro da face
-                    if cY > 100 and cY < grayEqCrop.shape[0] - 100:
-                        cv2.circle(grayEqCrop, (int(cX), int(cY)), int(radius),
-                                (0, 0, 255), 2)
-                        pts.append((cX, cY)) #salva os pontos em pts
-        if debug:
-            cv2.imshow("Processamento Demo", grayEqCrop)
-            cv2.waitKey(500)
-
-        print('Pontos Encontrados:' + str(len(pts)))
-
-
-
-        #processo de análise de linhas individuais (os pontos são escaneados pelo CV da esquerda pra direita, cima pra baixo)
-        #como numa varredura. Irei percorrer os pontos até que haja uma grande variação no valor y, aí eu saberei que a linha
-        #mudou para uma linha mais abaixo. Pequenas variações em Y devem ser toleradas devido ao entortamento da linha
-        last_Y = 0
-        num_linhas = 0
-        first_iteration = True
-        line_change = False
-        lista_y_das_linhas = [] #lista com os valores de Y dos pontos da linha X, a variancia desses valores de Y determinará o entortamento dela
-        temp_x_list = [] #listas temporarias pro meu plot
-        temp_y_list = []
-        for  (x,y) in pts:
-            if not first_iteration:
-                if line_change: #ao mudar a linha, salva-se a lista temporaria de pontos Y na lista principal (lista de listas, uma lista por linha)
-                    lista_y_das_linhas.append(temp_y_list)
-                    plt.plot(temp_x_list, temp_y_list) #plota-se os pontos daquela linha (para a cor ficar univorme)
-                    plt.scatter(temp_x_list[:],temp_y_list[:] ) #coloca a dispersão dos pontos daquela linha (cor tb uniforme)
-
-                    temp_x_list = [] #esvaziando as listas para a próxima linha
-                    temp_y_list = []
-                    temp_x_list.append(x)
-                    temp_y_list.append(y)
-                    line_change = False
-                else: #ainda dentro da mesma linha
-                    if abs(last_Y - y) < 8:  # isso significa que Y variou pouco, ou seja, estamos na mesma linha
-                        temp_x_list.append(x) # salva a coordenada x conforme percorre os pontos da linha
-                        temp_y_list.append(y)
-                    else: #trigger de mudança de linha
-                        num_linhas += 1
-                        line_change = True
-            last_Y = y #sempre salvar o ultimo valor de Y o ultimo ponto analizado para avaliar o delta
-            first_iteration  = False
-
-        print ('Linhas Encontradas: ' + str(num_linhas))
-
-        if num_linhas == 0:
-            return False
-
-        # Cálculo da Variância por linha e total
-        totalvar = 0 #variancia acumulada, usado pra calcular media
-        for i in range(num_linhas-1):
-            varlinha = np.var(lista_y_das_linhas[i])
-            print ('Variancia Linha ' + str(i+1) + ': ' + str(varlinha) + '\n') #calcula variância dos Ys da linha
-            if varlinha > 0.0:
-                totalvar += varlinha #acumula nessa variavel
-            else:
-                num_linhas -= 1
-                if num_linhas == 0:
-                    return False
-
-        totalvar = totalvar / num_linhas #tira a média
-
-        print ('Variancia total Media')
-        print (totalvar)
-
-
-        colorEqCrop = cv2.cvtColor(grayEqCrop,cv2.COLOR_GRAY2RGB) #convertendo minha grayEqCrop para imagem colorida
-
-        #printando os resultados
-        if totalvar > 5 :
-            print ('SUCESSO!')
-            return True
-            cv2.putText(colorEqCrop, 'SUCESSO NA PROVA DE VIDA', (80, 750), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 180, 0), 6)
-        else:
-            print ('FALHA')
-            return False
+            curr_time = time.ctime()
+            os.mkdir('results/%s' % curr_time)
             
-            if debug:
-                cv2.putText(colorEqCrop, 'FALHA NA PROVA DE VIDA', (100, 750), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 180), 6)
+            save_img(face_img, '1_face_img')
+            save_img(face_img, '2_face_img_reescaled')
+            save_img(gray, '3_gray')
+            save_img(grayEq, '4_grayEq')
+            save_img(grayEq_reescaled, '5_grayEq_reescaled')
+            save_img(blurred, '6_blurred')
+            save_img(thresh, '7_thresh')
+            save_img(colorEqCrop, '8_colorEqCrop')
 
-                cv2.imshow("Processamento Demo", colorEqCrop)
-                cv2.waitKey(50)
-
-        if debug:
-            plt.show() #mostrando a análise dos pontos de forma gráfica
-
-
-   
+        # Printing results
+        if total_var > 5:
+            print ('Sucess in life proof\n'); print('-----------------------------------------\n')
+            return True
+        else:
+            print ('Failed in file proof\n'); print('-----------------------------------------\n')
+            return False
+        
