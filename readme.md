@@ -6,11 +6,15 @@ A face authenticator system with life proof verification using cloud points.
 
 ### Life proof failed in tests with printed and smartphone photos.
 
-<img style="margin-left:70px;" width="250" src="docs/test1.png"> <img style="margin-left:70px;" width="250" src="docs/test2.png"> <img style="margin-left:70px;" width="251" src="docs/test3.png">
+<img width="250" src="docs/test1.png"> <img width="250" src="docs/test2.png"> <img width="252" src="docs/test3.png">
 
 ### Life proof sucess in a test with a real person.
 
-<img style="margin-left:90px;" width="321" src="docs/test5.png"> <img style="margin-left:20px;" width="400" src="docs/test4.png">
+<img width="321" src="docs/test5.png"> <img width="400" src="docs/test4.png">
+
+### Video test
+
+[![Sistemas Inteligentes Demonstração Algoritmo que reconhece fotos](docs/youtube.png)](https://www.youtube.com/watch?v=2OoXaFDKrZ0&feature=emb_title)
 
 # Our cloud point generator
 
@@ -18,7 +22,7 @@ We used a mechanical pencil with a PCB board to make holes in a sheet of aluminu
 
 
 
-<img style="margin-bottom: 60px;" src="docs/hardware3.png"> <img style="margin-left: 90px;" width="200" src="docs/hardware1.png"> <img style="margin-left: 300px;" width="366" src="docs/hardware2.png">
+<img src="docs/hardware3.png"> <img width="200" src="docs/hardware1.png"> <img align="right" width="364" src="docs/hardware2.png">
 
 \* It's also possible to use infrared led with a camera without IR filter.
 
