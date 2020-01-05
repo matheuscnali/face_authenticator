@@ -10,7 +10,6 @@ from multiprocessing import Process
 from view import Ui_MainWindow
 from authenticator import Authenticator
 
-debug = False
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -35,32 +34,32 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update_cam_img(self):
 
-        # Read image in BGR format.
+        # Read image in BGR format
         self.cam_img = self.cap.read()[1]
 
-        # Convert image to RGB format.
+        # Convert image to RGB format
         self.cam_img = cv2.cvtColor(self.cam_img, cv2.COLOR_BGR2RGB)
 
-        # Get image infos.
+        # Get image infos
         height, width, channel = self.cam_img.shape
         step = channel * width
 
-        # Create QImage from image.
+        # Create QImage from image
         qImg = QtGui.QImage(self.cam_img.data, width, height, step, QtGui.QImage.Format_RGB888)
 
-        # Show image in img_label.
+        # Show image in img_label
         self.ui.cam_img.setPixmap(QtGui.QPixmap.fromImage(qImg))
         
     def img_timer_control(self, delay):
 
         if not self.img_timer.isActive():
-            # Start timer.
+            # Start timer
             self.img_timer.start(delay)
 
         else:
             # Stop timer
             self.img_timer.stop()
-            # Release video capture.
+            # Release video capture
             self.cap.release()
 
 class AuthenticatorThread(QtCore.QThread):
@@ -130,11 +129,11 @@ if __name__ == '__main__':
 
     app = QtWidgets.QApplication(sys.argv)
 
-    # Create and show MainWindow.
-    mainWindow = MainWindow(img_source=0)
+    # Create and show MainWindow
+    mainWindow = MainWindow(img_source=1)
     mainWindow.show()
     
-    # Start authenticator thread.
+    # Start authenticator thread
     authenticator_thread = AuthenticatorThread(mainWindow)
     authenticator_thread.finished.connect(app.exit)
     authenticator_thread.start()

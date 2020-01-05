@@ -1,14 +1,13 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from imutils import contours
-from skimage import measure, img_as_ubyte
 import argparse
 import imutils
 import cv2
 import face_recognition
 import os
 import time
-
+import numpy as np
+import matplotlib.pyplot as plt
+from imutils import contours
+from skimage import measure, img_as_ubyte
 from PIL import Image, ImageDraw
 
 class Authenticator:
@@ -128,7 +127,11 @@ class Authenticator:
                                   (0, 0, 255), 2)
                         pts.append((cX, cY))
 
-        print('Number of Dots: %s' % str(len(pts)))
+        if(len(pts) < 10):
+            print('Failed in life proof, number of dots if too low. Number of Dots: %s' % str(len(pts)))
+            return False
+        else:
+            print('Number of Dots: %s' % str(len(pts)))
 
         # Analysing each line (Dots are analysed by OpenCV from left to right, top to bottom)
         # Lines are determined by the variation of the Y values
@@ -141,7 +144,7 @@ class Authenticator:
         temp_x_list = []; temp_y_list = [] # Temporary lines for plotting
         for (x, y) in pts:
             if not first_iteration:
-                if line_change: # When the line changes, the temporary line list is saved in the main line list.
+                if line_change: # When the line changes, the temporary line list is saved in the main line list
                     y_lines.append(temp_y_list)
                     plt.plot(temp_x_list, temp_y_list) # Plotting the line dots
                     plt.scatter(temp_x_list[:], temp_y_list[:] ) # Plotting the points of that line
