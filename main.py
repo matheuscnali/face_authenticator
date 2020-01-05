@@ -75,18 +75,25 @@ class AuthenticatorThread(QtCore.QThread):
 
     def add_user(self):
 
-        while True:
-            image = self.main_window.get_cam_img()
-            face_location = self.authenticator.face_crop(image)
+        image = self.main_window.get_cam_img()
+        face_location = self.authenticator.face_crop(image)
 
-            if face_location:
-                top, right, bottom, left = face_location
-                face = image[top:bottom, left:right]
-                
-                self.authenticator.add_user(face, self.main_window.ui.id_text.toPlainText())
-                break
+        if face_location:
+            top, right, bottom, left = face_location
             
-            time.sleep(0.3)
+            try:
+                face = image[top:bottom, left:right]
+                self.authenticator.add_user(face, self.main_window.ui.id_text.toPlainText())
+            except:
+                self.main_window.ui.text_result.setText("Face not detected!")
+                self.main_window.ui.img_result.setVisible(True)
+                self.main_window.ui.img_result.setPixmap(QtGui.QPixmap("data/gui_images/alert.png"))
+                return
+
+        else:
+            self.main_window.ui.text_result.setText("Face not detected!")
+            self.main_window.ui.img_result.setVisible(True)
+            self.main_window.ui.img_result.setPixmap(QtGui.QPixmap("data/gui_images/alert.png"))
 
     def remove_user(self):
 
@@ -130,7 +137,7 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
 
     # Create and show MainWindow
-    mainWindow = MainWindow(img_source=1)
+    mainWindow = MainWindow(img_source=0)
     mainWindow.show()
     
     # Start authenticator thread

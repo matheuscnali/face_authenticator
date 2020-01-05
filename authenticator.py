@@ -40,7 +40,10 @@ class Authenticator:
         
         # Get the biggest bounding box
         if faces_bb:
-            return max(faces_bb, key=get_bb_area)
+            face_bb = max(faces_bb, key=get_bb_area)
+            
+            # Enlarging face bounding box by 10%
+            return map(int, np.multiply(face_bb, 1.1))
         else:
             return False
 
@@ -176,8 +179,8 @@ class Authenticator:
         total_var = 0 # Cumulative variance, used to compute the average
         for i in range(lines_num-1):
             line_var = np.var(y_lines[i])
-            print('Line Variance %s: %.2f\n' % ((i+1), int(line_var))) # Compute the variance of Y coordinate of the dots in a line
             if line_var > 0.0:
+                print('Line Variance %s: %.2f\n' % ((i+1), int(line_var))) # Compute the variance of Y coordinate of the dots in a line
                 total_var += line_var # Accumulate in this variable
             else:
                 lines_num -= 1
@@ -202,7 +205,7 @@ class Authenticator:
             save_img(colorEqCrop, '8_colorEqCrop')
 
         # Printing results
-        if total_var > 5:
+        if total_var > 20:
             print ('Sucess in life proof\n'); print('-----------------------------------------\n')
             return True
         else:
